@@ -10,6 +10,7 @@ from torch.utils.data import IterableDataset
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, logging, set_seed
 
+from utils import get_question
 
 """
 Fine-Tune model on the Reddit ELI5 dataset
@@ -156,7 +157,7 @@ def create_datasets(tokenizer, args):
         use_auth_token=False,
         num_proc=args.num_workers if not args.streaming else None,
         streaming=args.streaming,
-    )
+    ).map(get_question)
     if args.streaming:
         print("Loading the dataset in streaming mode")
         valid_data = dataset.take(args.size_valid_set)
@@ -236,6 +237,7 @@ def run_training(args, train_data, val_data):
         weight_decay=args.weight_decay,
         run_name=args.model_path + "-finetuned",
         report_to="tensorboard",
+        logging_dir="runs",
         ddp_find_unused_parameters=False,
     )
 
@@ -245,8 +247,8 @@ def run_training(args, train_data, val_data):
     trainer.train()
 
     print("Saving last checkpoint of the model")
-    model.save_pretrained(os.path.join(args.output_dir, "final_checkpoint/"))
-    model.push_to_hub()
+    model.save_pretrained(args.output_dir + "_final_checkpoint/")
+    trainer.push_to_hub()
 
 def main(args):
     config = AutoConfig.from_pretrained(args.model_path)

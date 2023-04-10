@@ -18,7 +18,7 @@ from transformers import (
     TrainingArguments,
 )
 from transformers.utils import PaddingStrategy
-
+from utils import get_question
 
 DEFAULT_PAD_TOKEN = "[PAD]"
 DEFAULT_EOS_TOKEN = "</s>"
@@ -53,12 +53,6 @@ class ScriptArguments:
         default="gpt2",
         metadata={
             "help": "The model that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc."
-        },
-    )
-    tokenizer_name: Optional[str] = field(
-        default="gpt2",
-        metadata={
-            "help": "The tokenizer that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc."
         },
     )
     bf16: Optional[bool] = field(
@@ -132,9 +126,10 @@ training_args = TrainingArguments(
     optim=script_args.optim,
     lr_scheduler_type=script_args.lr_scheduler_type,
     report_to="tensorboard",
+    logging_dir="runs"
 )
 # Load the value-head model and tokenizer.
-tokenizer = AutoTokenizer.from_pretrained(script_args.tokenizer_name, use_auth_token=False)
+tokenizer = AutoTokenizer.from_pretrained(script_args.model_name, use_auth_token=False)
 config = AutoConfig.from_pretrained(script_args.model_name)
 
 if "llama" in script_args.model_name:
@@ -157,6 +152,7 @@ peft_config = LoraConfig(
     r=8,
     lora_alpha=32,
     lora_dropout=0.1,
+    modules_to_save=["classifier"]
 )
 
 model = AutoModelForSequenceClassification.from_pretrained(
@@ -197,6 +193,8 @@ def preprocess_function(examples):
 
 # preprocess the dataset and filter out QAs that are longer than 512
 train_dataset = train_dataset.map(
+    get_question
+).map(
     preprocess_function, batched=True, num_proc=num_proc, remove_columns=original_columns
 )
 print("train_dataset.shape before filter", train_dataset.shape)
@@ -204,7 +202,9 @@ train_dataset = train_dataset.filter(lambda x: len(x["input_ids_j"]) <= 512 and 
 print("train_dataset.shape after filter", train_dataset.shape)
 
 print("eval_dataset.shape before filter", eval_dataset.shape)
-eval_dataset = eval_dataset.map(preprocess_function, batched=True, num_proc=num_proc, remove_columns=original_columns)
+eval_dataset = eval_dataset.map(
+    get_question
+).map(preprocess_function, batched=True, num_proc=num_proc, remove_columns=original_columns)
 eval_dataset = eval_dataset.filter(lambda x: len(x["input_ids_j"]) <= 512 and len(x["input_ids_k"]) <= 512)
 print("eval_dataset.shape after filter", eval_dataset.shape)
 

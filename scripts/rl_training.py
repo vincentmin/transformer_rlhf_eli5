@@ -19,13 +19,14 @@ from typing import Optional
 import torch
 from accelerate import Accelerator
 from datasets import load_dataset
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig
 from tqdm import tqdm
 from transformers import Adafactor, AutoTokenizer, HfArgumentParser, pipeline
 
 from trl import AutoModelForCausalLMWithValueHead, PPOConfig, PPOTrainer, set_seed
 from trl.core import LengthSampler
 
+from utils import get_question
 
 DEFAULT_PAD_TOKEN = "[PAD]"
 DEFAULT_EOS_TOKEN = "</s>"
@@ -44,7 +45,6 @@ class ScriptArguments:
     # NOTE: gpt2 models use Conv1D instead of Linear layers which are not yet supported in 8 bit mode
     # models like gpt-neo* models are more suitable.
     model_name: Optional[str] = field(default="", metadata={"help": "the model name"})
-    tokenizer_name: Optional[str] = field(default="", metadata={"help": "the model name"})
     reward_model_name: Optional[str] = field(default="", metadata={"help": "the model name"})
     log_with: Optional[str] = field(default=None, metadata={"help": "use 'wandb' to log with wandb"})
     learning_rate: Optional[float] = field(default=1.41e-5, metadata={"help": "the learning rate"})
@@ -76,7 +76,7 @@ config = PPOConfig(
     model_name=script_args.model_name,
     learning_rate=script_args.learning_rate,
     log_with=script_args.log_with,
-    accelerator_kwargs={"logging_dir":script_args.output_dir},
+    accelerator_kwargs={"logging_dir": "runs"},
     batch_size=script_args.batch_size,
     mini_batch_size=script_args.mini_batch_size,
     gradient_accumulation_steps=script_args.gradient_accumulation_steps,
@@ -91,11 +91,11 @@ config = PPOConfig(
 # We set `return_all_scores` to True to get the sentiment score for each token.
 sent_kwargs = {"return_all_scores": True, "function_to_apply": "none", "batch_size": 16, "truncation": True}
 
-tokenizer = AutoTokenizer.from_pretrained(script_args.tokenizer_name)
+tokenizer = AutoTokenizer.from_pretrained(script_args.model_name)
 # GPT-2 tokenizer has a pad token, but it is not eos_token by default. We need to set it to eos_token.
 # only for this model.
 
-if "llama" in script_args.tokenizer_name:
+if "llama" in script_args.model_name:
     tokenizer.add_special_tokens(
         {
             "eos_token": DEFAULT_EOS_TOKEN,
@@ -143,6 +143,8 @@ def build_dataset(tokenizer, dataset_name: str):
     original_columns = ds.column_names
     num_proc = 4
     ds = ds.map(
+        get_question
+    ).map(
         preprocess_function,
         batched=True,
         num_proc=num_proc,
@@ -257,5 +259,5 @@ for epoch, batch in tqdm(enumerate(ppo_trainer.dataloader)):
     if script_args.save_freq and epoch and epoch % script_args.save_freq == 0:
         ppo_trainer.save_pretrained(script_args.output_dir + f"step_{epoch}")
 
-ppo_trainer.save_pretrained(script_args.output_dir + f"final_model")
-ppo_trainer.push_to_hub()
+ppo_trainer.save_pretrained(script_args.output_dir + f"_final_model")
+ppo_trainer.push_to_hub(script_args.output_dir)
