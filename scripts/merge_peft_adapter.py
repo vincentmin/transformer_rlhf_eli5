@@ -5,8 +5,8 @@ from typing import Optional
 import peft
 import torch
 from peft import PeftConfig, PeftModel
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
-
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, HfArgumentParser, \
+    AutoModelForSequenceClassification
 
 DEFAULT_PAD_TOKEN = "[PAD]"
 DEFAULT_EOS_TOKEN = "</s>"
@@ -23,17 +23,17 @@ class ScriptArguments:
     adapter_model_name: Optional[str] = field(default=None, metadata={"help": "the model name"})
     base_model_name: Optional[str] = field(default=None, metadata={"help": "the model name"})
     output_name: Optional[str] = field(default=None, metadata={"help": "the model name"})
-
+    huggingface_name: Optional[str] = field(default=None, metadata={"help": "the model name to push to huggingface"})
 
 parser = HfArgumentParser(ScriptArguments)
 script_args = parser.parse_args_into_dataclasses()[0]
 assert script_args.adapter_model_name is not None, "please provide the name of the Adapter you would like to merge"
 assert script_args.base_model_name is not None, "please provide the name of the Base model"
-assert script_args.base_model_name is not None, "please provide the output name of the merged model"
+assert script_args.output_name is not None, "please provide the output name of the merged model"
 
-# TODO: I believe these lines can be removed. To be checked.
-# peft_config = PeftConfig.from_pretrained(script_args.adapter_model_name)
-# model = AutoModelForCausalLM.from_pretrained(script_args.base_model_name, return_dict=True, torch_dtype=torch.bfloat16)
+peft_config = PeftConfig.from_pretrained(script_args.adapter_model_name)
+model = AutoModelForCausalLM.from_pretrained(script_args.base_model_name, return_dict=True, torch_dtype=torch.bfloat16)
+# model = AutoModelForSequenceClassification.from_pretrained(script_args.base_model_name, num_labels=1, return_dict=True, torch_dtype=torch.bfloat16)
 tokenizer = AutoTokenizer.from_pretrained(script_args.base_model_name)
 config = AutoConfig.from_pretrained(script_args.base_model_name)
 architecture = config.architectures[0]
@@ -63,4 +63,6 @@ for key in key_list:
 model = model.base_model.model
 
 model.save_pretrained(f"{script_args.output_name}")
-model.push_to_hub(f"{script_args.output_name}", use_temp_dir=False)
+if script_args.huggingface_name:
+    model.push_to_hub(f"{script_args.huggingface_name}", use_temp_dir=True)
+    tokenizer.push_to_hub(f"{script_args.huggingface_name}", use_temp_dir=True)

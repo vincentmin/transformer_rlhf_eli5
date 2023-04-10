@@ -45,7 +45,7 @@ class ScriptArguments:
         },
     )
     per_device_train_batch_size: Optional[int] = field(default=4)
-    per_device_eval_batch_size: Optional[int] = field(default=1)
+    per_device_eval_batch_size: Optional[int] = field(default=4)
     gradient_accumulation_steps: Optional[int] = field(default=1)
     learning_rate: Optional[float] = field(default=2e-5)
     weight_decay: Optional[int] = field(default=0.001)
@@ -53,6 +53,12 @@ class ScriptArguments:
         default="gpt2",
         metadata={
             "help": "The model that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc."
+        },
+    )
+    tokenizer_name: Optional[str] = field(
+        default="gpt2",
+        metadata={
+            "help": "The tokenizer that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc."
         },
     )
     bf16: Optional[bool] = field(
@@ -125,9 +131,10 @@ training_args = TrainingArguments(
     logging_steps=10,
     optim=script_args.optim,
     lr_scheduler_type=script_args.lr_scheduler_type,
+    report_to="tensorboard",
 )
 # Load the value-head model and tokenizer.
-tokenizer = AutoTokenizer.from_pretrained(script_args.model_name, use_auth_token=True)
+tokenizer = AutoTokenizer.from_pretrained(script_args.tokenizer_name, use_auth_token=False)
 config = AutoConfig.from_pretrained(script_args.model_name)
 
 if "llama" in script_args.model_name:
@@ -158,9 +165,10 @@ model = AutoModelForSequenceClassification.from_pretrained(
 model = get_peft_model(model, peft_config)
 model.print_trainable_parameters()
 
-# Need to do this for gpt2, because it doesn't have an official pad token.
-tokenizer.pad_token = tokenizer.eos_token
-model.config.pad_token_id = tokenizer.eos_token_id
+if "gpt2" in script_args.model_name:
+    # Need to do this for gpt2, because it doesn't have an official pad token.
+    tokenizer.pad_token = tokenizer.eos_token
+    model.config.pad_token_id = tokenizer.eos_token_id
 model.config.use_cache = not script_args.gradient_checkpointing
 num_proc = 4  # Can adjust to be higher if you have more processors.
 original_columns = train_dataset.column_names
@@ -191,10 +199,14 @@ def preprocess_function(examples):
 train_dataset = train_dataset.map(
     preprocess_function, batched=True, num_proc=num_proc, remove_columns=original_columns
 )
+print("train_dataset.shape before filter", train_dataset.shape)
 train_dataset = train_dataset.filter(lambda x: len(x["input_ids_j"]) <= 512 and len(x["input_ids_k"]) <= 512)
+print("train_dataset.shape after filter", train_dataset.shape)
 
+print("eval_dataset.shape before filter", eval_dataset.shape)
 eval_dataset = eval_dataset.map(preprocess_function, batched=True, num_proc=num_proc, remove_columns=original_columns)
 eval_dataset = eval_dataset.filter(lambda x: len(x["input_ids_j"]) <= 512 and len(x["input_ids_k"]) <= 512)
+print("eval_dataset.shape after filter", eval_dataset.shape)
 
 
 # We need to define a special data collator that batches the data in our j vs k format.
@@ -284,3 +296,5 @@ trainer.train(script_args.resume_from_checkpoint)
 
 print("Saving last checkpoint of the model")
 model.save_pretrained(output_name + "_peft_last_checkpoint")
+
+trainer.push_to_hub()

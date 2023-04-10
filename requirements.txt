@@ -1,9 +1,12 @@
 torch
 transformers
 datasets==2.11.0
-trl
+git+https://github.com/lvwerra/trl.git
 peft
 accelerate
 bitsandbytes
-lxml
+tensorboard
+evaluate
+scikit-learn
+#lxml
 #zstandard

@@ -19,7 +19,7 @@ from typing import Optional
 import torch
 from accelerate import Accelerator
 from datasets import load_dataset
-from peft import LoraConfig
+from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
 from transformers import Adafactor, AutoTokenizer, HfArgumentParser, pipeline
 
@@ -76,6 +76,7 @@ config = PPOConfig(
     model_name=script_args.model_name,
     learning_rate=script_args.learning_rate,
     log_with=script_args.log_with,
+    accelerator_kwargs={"logging_dir":script_args.output_dir},
     batch_size=script_args.batch_size,
     mini_batch_size=script_args.mini_batch_size,
     gradient_accumulation_steps=script_args.gradient_accumulation_steps,
@@ -141,7 +142,7 @@ def build_dataset(tokenizer, dataset_name: str):
     ds = ds.select(range(100000))
     original_columns = ds.column_names
     num_proc = 4
-    ds = train_dataset.map(
+    ds = ds.map(
         preprocess_function,
         batched=True,
         num_proc=num_proc,
@@ -225,7 +226,9 @@ generation_kwargs = {
     "top_p": 1.0,
     "do_sample": True,
     "pad_token_id": tokenizer.pad_token_id,
-    "eos_token_id": 100_000,
+    "eos_token_id": tokenizer.eos_token_id,
+    # "eos_token_id": 100_000,
+    # "max_new_tokens": 128,
 }
 output_min_length = 32
 output_max_length = script_args.output_max_length
@@ -253,3 +256,6 @@ for epoch, batch in tqdm(enumerate(ppo_trainer.dataloader)):
 
     if script_args.save_freq and epoch and epoch % script_args.save_freq == 0:
         ppo_trainer.save_pretrained(script_args.output_dir + f"step_{epoch}")
+
+ppo_trainer.save_pretrained(script_args.output_dir + f"final_model")
+ppo_trainer.push_to_hub()

@@ -234,8 +234,8 @@ def run_training(args, train_data, val_data):
         fp16=not args.no_fp16,
         bf16=args.bf16,
         weight_decay=args.weight_decay,
-        run_name=args.model_name + "-finetuned",
-        report_to="wandb",
+        run_name=args.model_path + "-finetuned",
+        report_to="tensorboard",
         ddp_find_unused_parameters=False,
     )
 
@@ -246,7 +246,7 @@ def run_training(args, train_data, val_data):
 
     print("Saving last checkpoint of the model")
     model.save_pretrained(os.path.join(args.output_dir, "final_checkpoint/"))
-
+    model.push_to_hub()
 
 def main(args):
     config = AutoConfig.from_pretrained(args.model_path)

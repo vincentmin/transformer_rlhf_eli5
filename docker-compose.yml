@@ -5,4 +5,20 @@ services:
       context: .
       dockerfile: nlp.Dockerfile
     volumes:
-      - $PWD:/app
+      - C:\Users\szvan\Documents\PersonalProjects\transformer_rlhf_eli5:/app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+  tensorboard:
+    build:
+      context: .
+      dockerfile: tensorboard.Dockerfile
+    command: "tensorboard --logdir /app/opt-125m-eli5-rl-finetune-128-8-8-1.4e-5_ada --bind_all"
+    volumes:
+      - C:\Users\szvan\Documents\PersonalProjects\transformer_rlhf_eli5:/app
+    ports:
+      - 6006:6006
