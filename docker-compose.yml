@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: nlp.Dockerfile
     volumes:
-      - C:\Users\szvan\Documents\PersonalProjects\transformer_rlhf_eli5:/app
+      - $PWD:/app
     deploy:
       resources:
         reservations:
@@ -17,8 +17,8 @@ services:
     build:
       context: .
       dockerfile: tensorboard.Dockerfile
-    command: "tensorboard --logdir /app/opt-125m-eli5-rl-finetune-128-8-8-1.4e-5_ada --bind_all"
+    command: "tensorboard --logdir /app/runs --bind_all"
     volumes:
-      - C:\Users\szvan\Documents\PersonalProjects\transformer_rlhf_eli5:/app
+      - $PWD:/app
     ports:
       - 6006:6006
