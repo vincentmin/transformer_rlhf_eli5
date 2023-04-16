@@ -32,7 +32,8 @@ assert script_args.base_model_name is not None, "please provide the name of the 
 assert script_args.output_name is not None, "please provide the output name of the merged model"
 
 peft_config = PeftConfig.from_pretrained(script_args.adapter_model_name)
-model = AutoModelForCausalLM.from_pretrained(script_args.base_model_name, return_dict=True, torch_dtype=torch.bfloat16)
+# model = AutoModelForCausalLM.from_pretrained(script_args.base_model_name, return_dict=True, torch_dtype=torch.bfloat16)
+model = AutoModelForSequenceClassification.from_pretrained(script_args.base_model_name, num_labels=1, return_dict=True, torch_dtype=torch.bfloat16)
 tokenizer = AutoTokenizer.from_pretrained(script_args.base_model_name)
 config = AutoConfig.from_pretrained(script_args.base_model_name)
 architecture = config.architectures[0]
