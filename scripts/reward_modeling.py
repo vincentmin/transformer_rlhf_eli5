@@ -70,7 +70,7 @@ class ScriptArguments:
         metadata={"help": "The size of the subset of the training data to use"},
     )
     eval_subset: Optional[int] = field(
-        default=50000,
+        default=5000,
         metadata={"help": "The size of the subset of the eval data to use"},
     )
     gradient_checkpointing: Optional[bool] = field(
@@ -93,10 +93,10 @@ script_args = parser.parse_args_into_dataclasses()[0]
 # Load the dataset for tuning the reward model.
 train_dataset = load_dataset("vincentmin/eli5_rlhf", data_dir="data/reward", split="train")
 if script_args.train_subset > 0:
-    train_dataset = train_dataset.select(range(script_args.train_subset))
-eval_dataset = load_dataset("vincentmin/eli5_rlhf", data_dir="data/evaluation", split="train")
+    train_dataset = train_dataset.shuffle().select(range(script_args.train_subset))
+eval_dataset = load_dataset("vincentmin/eli5_rlhf", data_dir="data/validation", split="train")
 if script_args.eval_subset > 0:
-    eval_dataset = eval_dataset.select(range(script_args.eval_subset))
+    eval_dataset = eval_dataset.shuffle().select(range(script_args.eval_subset))
 # Define the training args. Needs to be done before the model is loaded if you are using deepspeed.
 model_name_split = script_args.model_name.split("/")[-1]
 output_name = (
@@ -126,7 +126,8 @@ training_args = TrainingArguments(
     optim=script_args.optim,
     lr_scheduler_type=script_args.lr_scheduler_type,
     report_to="tensorboard",
-    logging_dir="runs"
+    logging_dir="runs",
+    hub_model_id="bloomz-1b1-eli5-reward"
 )
 # Load the value-head model and tokenizer.
 tokenizer = AutoTokenizer.from_pretrained(script_args.model_name, use_auth_token=False)
@@ -298,3 +299,6 @@ print("Saving last checkpoint of the model")
 model.save_pretrained(output_name + "_peft_last_checkpoint")
 
 trainer.push_to_hub()
+model.push_to_hub("vincentmin/bloomz-1b1-eli5-reward")
+model.config.push_to_hub("vincentmin/bloomz-1b1-eli5-reward")
+tokenizer.push_to_hub("vincentmin/bloomz-1b1-eli5-reward")

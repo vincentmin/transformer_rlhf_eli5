@@ -238,6 +238,7 @@ def run_training(args, train_data, val_data):
         run_name=args.model_path + "-finetuned",
         report_to="tensorboard",
         logging_dir="runs",
+        hub_model_id="bloomz-1b1-eli5-pretrained",
         ddp_find_unused_parameters=False,
     )
 
@@ -249,6 +250,9 @@ def run_training(args, train_data, val_data):
     print("Saving last checkpoint of the model")
     model.save_pretrained(args.output_dir + "_final_checkpoint/")
     trainer.push_to_hub()
+    model.push_to_hub("vincentmin/bloomz-1b1-eli5-pretrained")
+    model.config.push_to_hub("vincentmin/bloomz-1b1-eli5-pretrained")
+    model.tokenizer.push_to_hub("vincentmin/bloomz-1b1-eli5-pretrained")
 
 def main(args):
     config = AutoConfig.from_pretrained(args.model_path)

@@ -33,7 +33,6 @@ assert script_args.output_name is not None, "please provide the output name of t
 
 peft_config = PeftConfig.from_pretrained(script_args.adapter_model_name)
 model = AutoModelForCausalLM.from_pretrained(script_args.base_model_name, return_dict=True, torch_dtype=torch.bfloat16)
-# model = AutoModelForSequenceClassification.from_pretrained(script_args.base_model_name, num_labels=1, return_dict=True, torch_dtype=torch.bfloat16)
 tokenizer = AutoTokenizer.from_pretrained(script_args.base_model_name)
 config = AutoConfig.from_pretrained(script_args.base_model_name)
 architecture = config.architectures[0]
@@ -50,7 +49,7 @@ if "Llama" in architecture:
 
 # Load the Lora model
 model = PeftModel.from_pretrained(model, script_args.adapter_model_name)
-model.eval()
+# model.eval()
 
 key_list = [key for key, _ in model.base_model.model.named_modules() if "lora" not in key]
 for key in key_list:
